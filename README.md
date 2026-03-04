@@ -34,6 +34,23 @@ Better C++ programmers understand the machine first
 
 ---
 
+### Assembly Visualization Layer
+
+## 📘 Modern X86 Assembly Language Programming
+
+Purpose:
+
+For:
+
+    CPU-level clarity ✅
+
+    Register usage clarity ✅
+
+    Calling convention clarity ✅
+
+    Advanced performance knowledge ✅
+-----
+
 ## 2️⃣ C++ Foundation
 
 **Goal:**
