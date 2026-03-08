@@ -715,3 +715,164 @@ ret           → ஏன்? main() முடிந்தது
 ```
 
 இப்போது ஒவ்வொன்றுக்கும் ஏன், எதனால், எதற்கு — clear-ஆ புரிஞ்சதா? 🎯
+
+----
+
+இல்லை! `rsp` OS இல்லை!
+
+---
+
+## rsp என்றால் என்ன?
+
+```
+rsp = Register Stack Pointer
+
+CPU-ல் உள்ள ஒரு register மட்டுமே!
+"Stack-ல் இப்போது top எங்கே இருக்கு" 
+என்று point செய்யும் arrow மாதிரி!
+```
+
+---
+
+## Simple visual:
+
+```
+Stack (RAM-ல்):              rsp (CPU register):
+
+┌─────────────────┐
+│   item 3        │ ← rsp ───────────────→ இங்கே top இருக்கு
+├─────────────────┤
+│   item 2        │
+├─────────────────┤
+│   item 1        │
+└─────────────────┘
+
+push பண்ணினால்:
+┌─────────────────┐
+│   item 4        │ ← rsp ───────────────→ top கீழே நகர்ந்தது
+├─────────────────┤
+│   item 3        │
+├─────────────────┤
+│   item 2        │
+├─────────────────┤
+│   item 1        │
+└─────────────────┘
+```
+
+---
+
+## OS frame என்றால் என்ன தனியாக?
+
+```
+┌─────────────────┐
+│  OS frame       │ → RAM-ல் உள்ள memory பகுதி
+│  (libc startup) │   __libc_start_main() function
+│                 │   இது main()-ஐ call பண்றது
+└─────────────────┘
+        ↑
+        │
+rsp இதை point செய்யலாம்     ← rsp = pointer மட்டுமே!
+rbp இதை point செய்யலாம்     ← rbp = pointer மட்டுமே!
+
+OS frame = memory location (RAM)
+rsp/rbp  = அந்த location-ஐ point செய்யும் CPU registers
+```
+
+---
+
+## Summary:
+
+| | என்ன | எங்கே |
+|---|---|---|
+| `OS frame` | Memory பகுதி — libc startup data | RAM-ல் |
+| `rsp` | "Stack top எங்கே" என்று சொல்லும் pointer | CPU chip-ல் |
+| `rbp` | "Frame base எங்கே" என்று சொல்லும் pointer | CPU chip-ல் |
+
+**rsp = GPS arrow மாதிரி — இடம் இல்லை, direction மட்டுமே!** 🎯
+
+------
+
+Great question! இதை simple-ஆ பார்க்கலாம்!
+
+---
+
+## Frame Base என்றால் என்ன?
+
+```
+ஒவ்வொரு function-க்கும் stack-ல் தனி பகுதி = Frame
+
+main() frame:
+┌─────────────────┐ ← rsp (top — மாறிக்கொண்டே இருக்கும்)
+│  local var x    │
+│  local var y    │
+│  saved registers│
+├─────────────────┤ ← rbp (bottom — இது மாறாது!)
+│  old rbp value  │   இதுதான் "Frame Base"
+└─────────────────┘
+```
+
+**Frame Base = அந்த function-ஓட frame ஆரம்பிக்கும் இடம்!**
+
+---
+
+## ஏன் frame base தேவை?
+
+```c
+int main() {
+    int x = 10;   // rbp - 4  இடத்தில்
+    int y = 20;   // rbp - 8  இடத்தில்
+    int z = 30;   // rbp - 12 இடத்தில்
+}
+```
+
+```
+Stack:
+┌─────────────────┐ ← rsp (push/pop-ல் மாறும்)
+│  z = 30         │ rbp - 12
+│  y = 20         │ rbp - 8
+│  x = 10         │ rbp - 4
+├─────────────────┤ ← rbp (இது மாறாது — fixed!)
+│  old rbp        │
+└─────────────────┘
+
+CPU x கண்டுபிடிக்க:  rbp - 4  → direct!
+CPU y கண்டுபிடிக்க:  rbp - 8  → direct!
+CPU z கண்டுபிடிக்க:  rbp - 12 → direct!
+```
+
+---
+
+## rsp vs rbp வித்தியாசம்:
+
+```
+rsp = உயரும் தண்ணீர் மட்டம் மாதிரி — மாறிக்கொண்டே இருக்கும்
+rbp = கப்பலின் நங்கூரம் மாதிரி  — fixed, அசையாது!
+
+┌─────────────────┐ ← rsp (push பண்ண கீழே போகும்)
+│                 │        (pop பண்ண மேலே வரும்)
+│  variables      │
+│                 │
+├─────────────────┤ ← rbp (function முழுக்க same இடம்!)
+│  old rbp        │
+└─────────────────┘
+```
+
+---
+
+## Simple-ஆ சொன்னால்:
+
+```
+வீட்டு address மாதிரி:
+
+rbp = வீட்டு main door (fixed!)
+rsp = வீட்டுக்குள் நீங்கள் இருக்கும் இடம் (மாறும்!)
+
+CPU variable தேட:
+  "rbp இருந்து எத்தனை steps?" → கண்டுபிடிக்கும்!
+  rsp மாறினாலும் பரவாயில்லை — rbp fixed!
+```
+
+இப்போது frame base புரிஞ்சதா? 🎯
+
+---------
+
