@@ -414,3 +414,330 @@ main: ஆரம்பம்
 ```
 
 இப்போது clear-ஆ புரிஞ்சதா? 🎯
+
+--------
+
+Stack frame concept-ஐ முதலில் புரிஞ்சுக்கோம், அப்புறம் full flow பார்க்கலாம்!
+
+---
+
+## முதலில் — Stack என்றால் என்ன?
+
+```
+RAM-ல் ஒரு பகுதி — Stack:
+
+High address  ┌─────────────┐
+              │  OS / Kernel │
+              ├─────────────┤
+              │    Stack     │ ← கீழே வளரும் (↓)
+              │      ↓       │
+              │    (empty)   │
+              │      ↑       │
+              │    Heap      │ ← மேலே வளரும்
+              ├─────────────┤
+              │ Code (.text) │
+Low address   └─────────────┘
+```
+
+**Plate stack மாதிரி** — மேலே போடுவோம், மேலிருந்து எடுப்போம்.
+
+---
+
+## Frame என்றால் என்ன?
+
+**ஒவ்வொரு function-க்கும் stack-ல் தனி பகுதி = Frame**
+
+```
+OS → main() call பண்ணும்
+main() → puts() call பண்ணும்
+
+Stack-ல்:
+┌─────────────────┐  ← rsp (top)
+│   puts() frame  │  ← புதியது மேலே
+├─────────────────┤
+│   main() frame  │  ← இது "பழைய frame"
+├─────────────────┤
+│    OS frame     │  ← main-ஐ call பண்ணியது
+└─────────────────┘
+```
+
+---
+
+## இப்போது Full Flow — Deep explanation:
+
+---
+
+### `endbr64` → Security Check
+
+```
+Intel CET (Control-flow Enforcement Technology)
+
+Hacker attack type:
+  program-ஓட random இடத்தில் jump பண்ணி
+  தன்னுடைய malicious code run பண்ணுவான்
+
+endbr64 என்பது:
+  "இந்த இடம் valid function entry point"
+  என்று CPU-க்கு mark பண்றது
+
+Valid jump:   endbr64 உள்ள இடம் → ✅ allowed
+Invalid jump: endbr64 இல்லாத இடம் → ❌ CPU block!
+```
+
+---
+
+### `pushq %rbp` → பழைய Frame Save
+
+**பழைய frame என்றால் OS-ஓட frame!**
+
+```
+main() call ஆவதற்கு முன்:
+
+Stack:                    Registers:
+┌─────────────┐           rbp → OS frame-ஓட base
+│  OS frame   │           rsp → stack top (இங்கே point)
+│  ...        │
+│  rbp value  │ ← rbp இப்போது இதை point செய்கிறது
+└─────────────┘
+
+pushq %rbp என்பது:
+  rsp ஒரு step கீழே போகும் (8 bytes)
+  அந்த இடத்தில் rbp-ஓட value copy ஆகும்
+
+After pushq:
+┌─────────────┐  ← rsp (new top)
+│ [old rbp]   │  ← OS frame base address save ஆச்சு!
+├─────────────┤
+│  OS frame   │
+└─────────────┘
+
+ஏன் save பண்றோம்?
+main() முடிந்தவுடன் OS-க்கு திரும்ப போக வேண்டும்
+OS-ஓட frame address தெரியணும்
+அதனால save பண்றோம்!
+```
+
+---
+
+### `movq %rsp, %rbp` → புதிய Frame உருவாக்கு
+
+**புதிய frame என்றால் main()-ஓட frame!**
+
+```
+Before:
+  rsp → stack top (old rbp save ஆன இடம்)
+  rbp → இன்னும் OS frame-ஐ point செய்கிறது
+
+movq %rsp, %rbp:
+  rsp-ஓட value → rbp-க்கு copy
+
+After:
+  rsp → stack top
+  rbp → same இடம்! (rsp == rbp இப்போது)
+
+┌─────────────┐  ← rsp AND rbp இரண்டும் இங்கே!
+│ [old rbp]   │  ← main() frame ஆரம்பம்
+├─────────────┤
+│  OS frame   │
+└─────────────┘
+
+இதுதான் main()-ஓட புதிய frame base!
+இனிமேல் main()-ஓட variables இங்கிருந்து கீழே போகும்
+```
+
+---
+
+### `leaq .LC0(%rip), %rax` → String Address Load
+
+```
+Memory layout:
+┌──────────────────────────────┐
+│ .rodata section              │
+│ address 0x2004: H e l l o ,  │
+│          W o r l d ! \0      │
+│          ↑                   │
+│         .LC0 label இங்கே     │
+└──────────────────────────────┘
+
+rip = இப்போது CPU இந்த instruction-ஐ execute பண்றது
+      அந்த instruction-ஓட address
+
+leaq .LC0(%rip):
+  rip + offset = .LC0-ஓட exact address கணக்கிடு
+  அந்த address → rax-ல் வை
+
+After:
+  rax = 0x2004 (string இருக்கும் address)
+
+ஏன் value இல்ல, address?
+  puts() function-க்கு string-ஐ கொடுக்க வேண்டும்
+  string முழுக்க copy பண்றது slow
+  address மட்டும் கொடுத்தால் puts() நேரடியா படிக்கும்!
+```
+
+---
+
+### `movq %rax, %rdi` → Argument Ready
+
+```
+Linux function call rule (System V AMD64 ABI):
+  1st argument → rdi
+  2nd argument → rsi
+  3rd argument → rdx
+  ... and so on
+
+puts("Hello, World!") call பண்ண:
+  "Hello, World!"-ஓட address → rdi-ல் இருக்கணும்
+
+rax-ல் address இருக்கு → rdi-க்கு copy!
+
+After:
+  rdi = 0x2004 (string address)
+  puts() call ஆனதும் rdi-ல் பார்க்கும் → string கிடைக்கும்!
+```
+
+---
+
+### `call puts@PLT` → puts() Call!
+
+```
+call என்பது 2 காரியம் செய்யும்:
+
+1. Return address save:
+   ┌─────────────────┐  ← rsp
+   │ return address  │  ← "puts முடிந்தவுடன் இங்கே வா"
+   ├─────────────────┤
+   │ [old rbp]       │
+   ├─────────────────┤
+   │  OS frame       │
+   └─────────────────┘
+
+2. puts() code-க்கு jump!
+
+@PLT என்றால்:
+  puts() code நம்ம program-ல் இல்ல
+  libc.so என்ற external library-ல் இருக்கு
+
+PLT (Procedure Linkage Table):
+  program → PLT → "puts எங்கே இருக்கு?" → libc.so → puts() run!
+
+puts() உள்ளே:
+  rdi-ல் உள்ள address படிக்கும்
+  "Hello, World!" bytes ஒவ்வொன்னா எடுக்கும்
+  Linux write() syscall பண்ணும்
+  Kernel terminal-ல் print பண்ணும்
+  Terminal-ல் தெரியும்: Hello, World!
+```
+
+---
+
+### `movl $0, %eax` → Return Value
+
+```
+return 0; → இதுதான்!
+
+Linux rule:
+  program successfully முடிந்தால் → 0 return
+  error ஆனால்              → non-zero return
+
+eax = 0 → OS-க்கு "சரியாக முடிந்தது" சொல்வது
+
+Terminal-ல் check பண்ணலாம்:
+  ./hello
+  echo $?    → 0 வரும்! (success)
+```
+
+---
+
+### `popq %rbp` → பழைய Frame Restore
+
+```
+pushq-ஓட exact opposite!
+
+Before pop:
+┌─────────────────┐  ← rsp
+│ [old rbp value] │  ← save பண்ணியது
+├─────────────────┤
+│  OS frame       │
+└─────────────────┘
+
+popq %rbp:
+  stack top-ல் உள்ள value எடு → rbp-க்கு போடு
+  rsp ஒரு step மேலே போகும்
+
+After pop:
+┌─────────────────┐  ← rsp
+│  OS frame       │
+└─────────────────┘
+  rbp → OS frame-ஐ மீண்டும் point செய்கிறது!
+
+main()-ஓட frame clean ஆச்சு!
+```
+
+---
+
+### `ret` → OS-க்கு திரும்பு
+
+```
+ret என்பது:
+  stack top-ல் உள்ள return address எடு
+  அந்த address-க்கு jump!
+
+Stack-ல் இருப்பது:
+┌─────────────────┐  ← rsp
+│ return address  │  ← OS-ஓட "main முடிந்தவுடன் இங்கே வா"
+└─────────────────┘
+
+ret → அந்த address-க்கு jump → OS-க்கு திரும்பு
+OS → eax-ல் 0 பார்க்கும் → "program success!" → process kill
+```
+
+---
+
+## Complete Stack Visual — Full Flow
+
+```
+Program start:
+════════════════════════════════
+OS frame இருக்கு, main() call பண்றது
+
+After pushq %rbp:
+┌──────────────┐ ← rsp
+│ OS rbp value │ saved!
+├──────────────┤
+│   OS frame   │
+└──────────────┘
+
+After movq %rsp,%rbp: (main frame ready)
+┌──────────────┐ ← rsp = rbp (main frame base)
+│ OS rbp value │
+├──────────────┤
+│   OS frame   │
+└──────────────┘
+
+After call puts: (puts frame உருவாகும்)
+┌──────────────┐ ← rsp
+│  puts frame  │ puts() running...
+│return address│ "Hello, World!" print ஆகும்!
+├──────────────┤ ← rbp
+│ OS rbp value │
+├──────────────┤
+│   OS frame   │
+└──────────────┘
+
+After puts returns:
+┌──────────────┐ ← rsp = rbp
+│ OS rbp value │ puts frame gone!
+├──────────────┤
+│   OS frame   │
+└──────────────┘
+
+After popq %rbp + ret:
+┌──────────────┐
+│   OS frame   │ ← main frame gone! OS-க்கு திரும்பியது
+└──────────────┘
+════════════════════════════════
+Program exit! eax=0 → success!
+```
+
+இப்போது frame என்றால் என்ன, பழையது புதியது என்றால் என்ன — clear-ஆ புரிஞ்சதா? 🎯
