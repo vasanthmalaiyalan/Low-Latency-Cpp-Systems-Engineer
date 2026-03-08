@@ -1,4 +1,4 @@
->`STEP 2 — Preprocessing (hello.i)
+```STEP 2 — Preprocessing (hello.i)
 
 Command: gcc -E hello.c -o hello.i
 
@@ -18,7 +18,7 @@ int main() {
     printf("Hello, World!\n");
     return 0;
 }
-`
+```
 -----
 
 ஒவ்வொன்றாக deep-ஆக பார்க்கலாம்!
