@@ -59,3 +59,54 @@ Disk-ல் இருப்பது: pure binary bits (magnetic/flash storage)
 | Memory allocation நடக்கும் | ❌ Disk write மட்டுமே, RAM இல்ல |
 
 நீங்கள் concept புரிந்துகொண்டீர்கள் — **"memory"** என்ற word-ஐ **"disk storage"** என்று replace பண்ணினால் நீங்கள் சொன்னது 100% correct! 🎯
+
+--
+`ok, அந்த ப்ரோக்ராம் வேகமாக வேலை செய்வதற்காகத்தான் ram பயன்படுத்துகிறோமா இது temporary?`
+
+**ஆமா, ஆனால் அதை விட இன்னும் deeper reason இருக்கு!**
+
+---
+
+## Speed மட்டும் இல்ல — CPU-க்கு RAM **கட்டாயம்** தேவை!
+
+```
+CPU → நேரடியாக Disk படிக்க முடியாது!
+CPU → RAM மட்டுமே படிக்க முடியும்!
+```
+
+**இதுதான் main reason** — Speed secondary.
+
+---
+
+## Speed comparison புரிய:
+
+| Storage | Speed | CPU access? |
+|---|---|---|
+| CPU Cache (L1) | ~1 ns | ✅ Direct |
+| RAM | ~100 ns | ✅ Direct |
+| SSD (Disk) | ~100,000 ns | ❌ Cannot directly |
+| HDD (Disk) | ~10,000,000 ns | ❌ Cannot directly |
+
+CPU-க்கு disk address என்பது **exist இல்லவே இல்ல** — CPU bus RAM-உடன் மட்டுமே connected.
+
+---
+
+## Temporary ஏன்?
+
+```
+Power OFF → RAM-ல் உள்ள எல்லாமே gone!
+           → Disk-ல் உள்ளது safe (magnetic/flash)
+```
+
+RAM = **Electric charge** வைத்து data store செய்யும் — current போனால் data போகும்.
+
+---
+
+## Summary
+
+RAM பயன்படுத்துவதற்கு **2 reasons:**
+
+1. **CPU-க்கு disk directly access முடியாது** ← главный reason
+2. **Speed** ← bonus reason
+
+Temporary ஆனது by design — program முடிந்தவுடன் அந்த memory OS-க்கு திரும்ப போகும்! ✅
