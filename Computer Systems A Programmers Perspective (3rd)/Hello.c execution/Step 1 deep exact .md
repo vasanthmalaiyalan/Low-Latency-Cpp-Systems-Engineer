@@ -701,9 +701,5 @@ Linux filesystem-ல் **inode = file identity**
 
 இரண்டும் சேர்ந்து தான் file write நடக்கும்.
 
----
-
-நீ விரும்பினால் நான் அடுத்ததாக **“ஒரு hello.c file ext4 disk-ல் actual layout (superblock → inode table → data blocks)”** எப்படி இருக்கும் என்று diagram-ஆக காட்டலாம்.
-அது filesystem concepts-ஐ மிகவும் deep-ஆ புரிய வைக்கும்.
 ------
 
