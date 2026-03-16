@@ -1,5 +1,26 @@
 சரி 👍
-நீ கேட்டது போலவே **STEP-2 (Preprocessing)**-ஐ **மிகத் தெளிவாகவும் deep-ஆவும்**, exact flow-உடன் explain செய்கிறேன்.
+நாம் **STEP-1**-ல் பார்த்த மாதிரி (hardware → kernel → user → filesystem) இப்போது **STEP-2 Preprocessing**-ஐயும் **exact execution + Linux internals** உடன் பார்க்கலாம்.
+இங்கு முக்கியம்: **compiler mostly user space-ல் தான் வேலை செய்கிறது**. Kernel வேலை mainly **file I/O + process management**.
+
+நாம் பார்க்கும் pipeline:
+
+```
+terminal command
+↓
+shell
+↓
+kernel (process create)
+↓
+gcc process (user space)
+↓
+cpp preprocessor
+↓
+read header files
+↓
+text transformation
+↓
+write hello.i
+```
 
 ---
 
@@ -11,41 +32,207 @@ Command:
 gcc -E hello.c -o hello.i
 ```
 
-இதன் அர்த்தம்:
+Meaning:
 
-| part         | meaning                    |
+| option       | meaning                    |
 | ------------ | -------------------------- |
-| `gcc`        | GNU C compiler driver      |
+| `gcc`        | compiler driver            |
 | `-E`         | preprocessing மட்டும் செய் |
-| `hello.c`    | input source file          |
-| `-o hello.i` | output file name           |
+| `hello.c`    | input                      |
+| `-o hello.i` | output file                |
 
-இந்த command run ஆனதும் **compiler இன்னும் start ஆகாது**.
-முதலில் **preprocessor (cpp)** மட்டும் run ஆகும்.
+---
 
-Pipeline:
+# 1️⃣ Terminal command
+
+**User Space**
+
+நீ terminal-ல் type செய்கிறாய்:
+
+```bash
+gcc -E hello.c -o hello.i
+```
+
+Terminal program (shell) example:
+
+* Bash
+
+Shell command parse செய்கிறது.
+
+Example parsed arguments:
 
 ```
-hello.c
-↓
-cpp (preprocessor)
-↓
-hello.i
+argv[0] = "gcc"
+argv[1] = "-E"
+argv[2] = "hello.c"
+argv[3] = "-o"
+argv[4] = "hello.i"
 ```
 
 ---
 
-# Preprocessor என்ன செய்கிறது
+# 2️⃣ Process creation
 
-Preprocessor **C language புரிந்து கொள்ளாது**.
+Shell kernel-க்கு request செய்கிறது.
 
-அது செய்யும் வேலை:
+System call:
+
+```c
+fork()
+execve("/usr/bin/gcc", argv, env)
+```
+
+**Kernel Space**
+
+Kernel செய்யும் வேலை:
 
 ```
-text processing மட்டும்
+create new process
+load gcc executable
+setup memory
 ```
 
-அதாவது:
+Process memory layout:
+
+```
+User Space
+-----------------
+.text
+.data
+.heap
+.stack
+```
+
+gcc program start ஆகும்.
+
+---
+
+# 3️⃣ gcc driver
+
+**User Space**
+
+gcc driver program decide செய்கிறது:
+
+```
+pipeline
+```
+
+Normal compilation:
+
+```
+cpp → cc1 → as → ld
+```
+
+ஆனால் `-E` flag இருந்ததால்:
+
+```
+cpp மட்டும்
+```
+
+Preprocessor program:
+
+```
+cpp
+```
+
+---
+
+# 4️⃣ hello.c open
+
+gcc file open செய்கிறது.
+
+User space call:
+
+```c
+open("hello.c", O_RDONLY)
+```
+
+**Kernel Space**
+
+Kernel VFS layer:
+
+```
+sys_open()
+↓
+vfs_open()
+↓
+ext4 filesystem
+```
+
+File locate:
+
+```
+hello.c → inode → disk blocks
+```
+
+Kernel return செய்கிறது:
+
+```
+fd = 3
+```
+
+User space-க்கு.
+
+---
+
+# 5️⃣ File read
+
+gcc source file read செய்கிறது.
+
+User space call:
+
+```c
+read(3, buffer, size)
+```
+
+Kernel:
+
+```
+sys_read()
+↓
+vfs_read()
+↓
+page cache
+↓
+disk (if needed)
+```
+
+Kernel copy:
+
+```
+kernel buffer → user buffer
+```
+
+User memory example:
+
+```
+0x7fff5000
+------------------
+#include <stdio.h>
+int main() {
+    printf("Hello\n");
+}
+```
+
+---
+
+# 6️⃣ Preprocessor start
+
+**User Space**
+
+Program:
+
+```
+cpp
+```
+
+Input:
+
+```
+source text
+```
+
+Preprocessor analyse செய்யும் directives:
 
 ```
 #include
@@ -54,64 +241,11 @@ text processing மட்டும்
 comments
 ```
 
-போன்றவற்றை **text manipulation** செய்யும்.
-
 ---
 
-# Initial file — hello.c
+# 7️⃣ #include expansion
 
-Disk-ல் இருக்கும் file:
-
-```c
-#include <stdio.h>
-
-int main() {
-    printf("Hello, World!\n");
-    return 0;
-}
-```
-
-Bytes (example):
-
-```
-23 69 6e 63 6c 75 64 65 20 3c 73 74 64 69 6f 2e 68 3e
-```
-
-Meaning:
-
-```
-#include <stdio.h>
-```
-
----
-
-# 1️⃣ File read
-
-gcc process start ஆனதும்:
-
-Kernel calls:
-
-```c
-open("hello.c", O_RDONLY)
-read(fd, buffer, size)
-```
-
-Memory:
-
-```
-User RAM
--------------------
-#include <stdio.h>
-int main() { ... }
-```
-
-இந்த text preprocessor-க்கு அனுப்பப்படும்.
-
----
-
-# 2️⃣ `#include` expansion
-
-hello.c-ல்:
+Code:
 
 ```c
 #include <stdio.h>
@@ -120,109 +254,78 @@ hello.c-ல்:
 Preprocessor search path:
 
 ```
-/usr/include/stdio.h
+/usr/include
 ```
 
-File open:
+User call:
 
 ```c
 open("/usr/include/stdio.h")
 ```
 
-stdio.h content read செய்யப்படும்.
+Kernel:
+
+```
+sys_open()
+↓
+VFS
+↓
+filesystem
+↓
+inode
+```
+
+File read:
+
+```c
+read(fd, buffer, size)
+```
+
+Header content load செய்யப்படும்.
 
 Example snippet:
 
 ```c
-extern int printf(const char *__restrict __fmt, ...);
+extern int printf(const char *, ...);
 ```
 
 ---
 
-### முக்கிய விஷயம்
+# 8️⃣ Copy paste include
 
-Preprocessor **pointer வைத்து link செய்யாது**.
+Preprocessor **text replace** செய்கிறது.
 
-அது literally:
-
-```
-COPY + PASTE
-```
-
-செய்யும்.
-
----
-
-### Before preprocessing
+Before:
 
 ```c
 #include <stdio.h>
 
 int main() {
-    printf("Hello\n");
-}
 ```
 
----
-
-### After preprocessing
+After:
 
 ```c
 extern int printf(const char *, ...);
 
 int main() {
-    printf("Hello\n");
-}
 ```
 
-Real output:
+Actually:
 
 ```
 stdio.h + other headers
-≈ 800+ lines
+≈ hundreds lines
 ```
 
 ---
 
-# 3️⃣ Nested includes
-
-stdio.h-ல் மேலும் include இருக்கும்.
-
-Example:
-
-```c
-#include <bits/libc-header-start.h>
-```
-
-இதனால் preprocessor recursive expand செய்யும்.
-
-Pipeline:
-
-```
-hello.c
-↓
-stdio.h
-↓
-bits headers
-↓
-glibc headers
-```
-
-Result:
-
-```
-hundreds / thousands lines
-```
-
----
-
-# 4️⃣ Macro expansion
+# 9️⃣ Macro expansion
 
 Example:
 
 ```c
 #define MAX 100
-
 int arr[MAX];
 ```
 
@@ -235,22 +338,20 @@ int arr[100];
 Process:
 
 ```
-text search
+token search
 ↓
-replace
+text replacement
 ```
-
-Compiler logic இல்லை.
 
 ---
 
-# 5️⃣ Comment removal
+# 🔟 Comment removal
 
 Input:
 
 ```c
 // comment
-/* another comment */
+/* comment */
 ```
 
 Output:
@@ -262,12 +363,12 @@ Output:
 Reason:
 
 ```
-comments compiler-க்கு தேவையில்லை
+compiler-க்கு தேவையில்லை
 ```
 
 ---
 
-# 6️⃣ Conditional compilation
+# 1️⃣1️⃣ Conditional compilation
 
 Example:
 
@@ -277,55 +378,115 @@ printf("debug\n");
 #endif
 ```
 
-If DEBUG defined:
+Preprocessor check செய்கிறது:
 
 ```
-keep block
+macro defined?
 ```
 
-Else:
+Result:
 
 ```
-remove block
+block keep / remove
 ```
 
 ---
 
-# 7️⃣ Line markers
+# 1️⃣2️⃣ Output buffer
 
-Preprocessed output-ல் இந்த மாதிரி lines இருக்கும்:
-
-```c
-# 1 "hello.c"
-# 1 "/usr/include/stdio.h" 1 3 4
-```
-
-இதன் வேலை:
-
-```
-compiler-க்கு source mapping
-```
+Final preprocessed text memory-ல் இருக்கும்.
 
 Example:
 
 ```
-error → correct file + line number
+User Space
+-----------------------
+0x7fff8000
+
+extern int printf(const char *, ...);
+
+int main() {
+    printf("Hello\n");
+    return 0;
+}
 ```
 
 ---
 
-# 8️⃣ Final output file
+# 1️⃣3️⃣ Write hello.i
 
-Preprocessor create செய்யும் file:
+gcc call செய்கிறது:
+
+```c
+open("hello.i", O_WRONLY)
+write(fd, buffer, size)
+```
+
+Kernel:
+
+```
+sys_write()
+↓
+VFS
+↓
+ext4
+↓
+page cache
+↓
+disk
+```
+
+Disk block example:
+
+```
+inode → blocks
+```
+
+File created:
 
 ```
 hello.i
 ```
 
-Example output:
+---
 
-```c
-# 1 "hello.c"
+# STEP-2 Complete pipeline
+
+```
+User Space
+-----------
+terminal command
+↓
+shell
+↓
+gcc process
+↓
+cpp preprocessor
+↓
+text transformation
+
+Kernel Space
+-------------
+open()
+read()
+write()
+filesystem
+disk I/O
+```
+
+---
+
+# Result
+
+Output file:
+
+```
+hello.i
+```
+
+Example content:
+
+```
 extern int printf(const char *, ...);
 
 int main() {
@@ -342,116 +503,31 @@ Real output:
 
 ---
 
-# hello.c vs hello.i
+# Important CSAPP concept
 
-| file    | content         |
-| ------- | --------------- |
-| hello.c | original source |
-| hello.i | expanded source |
-
----
-
-# முக்கிய point
-
-hello.i:
+இந்த stage-ல் நடப்பது:
 
 ```
-still text file
-still C code
-still human readable
+source code transformation
 ```
 
-Binary இல்லை.
+Binary இன்னும் இல்லை.
 
----
-
-# Preprocessor summary
-
-Preprocessor செய்யும் வேலை:
-
-```
-#include  → header copy paste
-#define   → macro replace
-comments  → remove
-#ifdef    → conditional code
-#line     → source mapping
-```
-
-இதற்குப் பிறகு கிடைக்கும் file:
-
-```
-pure C code
-compiler-க்கு ready
-```
-
----
-
-# STEP-2 pipeline
+Pipeline:
 
 ```
 hello.c
 ↓
-gcc driver
-↓
-open + read
-↓
-cpp (preprocessor)
-↓
-expand includes
-↓
-expand macros
-↓
-remove comments
-↓
-resolve #ifdef
+preprocessor
 ↓
 hello.i
 ```
 
 ---
 
-# முக்கிய CSAPP concept
-
-Computer systems book சொல்லும் முக்கிய idea:
-
-```
-Programs are translated through multiple stages.
-```
-
-Stages:
-
-```
-C source
-↓
-preprocessed source (.i)
-↓
-assembly (.s)
-↓
-object (.o)
-↓
-executable
-```
+✅ இப்போது **STEP-2 exact execution (user space + kernel space + filesystem)** முழுவதும் பார்த்தோம்.
 
 ---
 
-✅ இதுவே **STEP-2 preprocessing deep execution**.
-
----
-
-நீ விரும்பினால் அடுத்ததாக நான்
-**STEP-3 — Compilation (hello.s)**-ஐ
-
-```
-tokens
-↓
-AST
-↓
-IR
-↓
-optimization
-↓
-assembly generation
-```
-
-என்ற **compiler internal pipeline வரை deep-ஆ explain செய்யலாம்.**
-அது தான் compiler-ன் most interesting part.
+நீ விரும்பினால் அடுத்ததாக நான் **STEP-2-இன் உள்ளே cpp internal algorithm (include search, macro table, token buffer)** எப்படி வேலை செய்கிறது என்பதை **compiler source code level-ல்** காட்ட முடியும்.
+அது systems programming-ல் மிகவும் deep concept.
