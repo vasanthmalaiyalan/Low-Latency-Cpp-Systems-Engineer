@@ -1,48 +1,17 @@
 சரி 👍
-நாம் இதுவரை பேசின **அனைத்து concepts** (keyboard → kernel → user space → editor → filesystem → disk) ஒன்றாக சேர்த்து **exact execution pipeline** காட்டுகிறேன்.
-ஒவ்வொரு இடத்திலும் **Hardware / Kernel Space / User Space** என்று தெளிவாக பிரிக்கிறேன்.
+இப்போது **STEP-1 முழு flow-ஐ Linux kernel source level-க்கு அருகில் இருக்கும் real path-ஆக** பார்க்கலாம்.
+(Keyboard → Kernel driver → TTY → User program → Save → Filesystem → Disk)
+
+நாம் இரண்டு பகுதி பார்ப்போம்:
+
+1️⃣ **Typing (# screen-ல் தோன்றுவது)**
+2️⃣ **Save செய்தபின் disk-க்கு எழுதுவது**
 
 ---
 
-# 0️⃣ ஆரம்ப நிலை (Editor already running)
+# PART 1 — Keyboard → Screen
 
-**User Space**
-
-உதாரணம் editor:
-
-* Vim
-* Visual Studio Code
-
-Editor terminal-ல் ஓடிக் கொண்டிருக்கிறது.
-
-Editor code input காத்திருக்கிறது:
-
-```c
-char buf[1];
-read(0, buf, 1);
-```
-
-Meaning:
-
-| parameter | meaning     |
-| --------- | ----------- |
-| `0`       | stdin       |
-| `buf`     | user memory |
-| `1`       | 1 byte      |
-
-User memory:
-
-```
-User Space
-----------------------
-0x7ffe9100 : ??
-```
-
----
-
-# 1️⃣ Keyboard press
-
-**Hardware**
+## 1️⃣ Keyboard hardware
 
 நீ press செய்கிறாய்:
 
@@ -50,9 +19,13 @@ User Space
 Shift + 3
 ```
 
-PS/2 keyboard controller detect செய்கிறது.
+Keyboard controller detect செய்கிறது:
 
-Scan codes generate:
+```
+scan code
+```
+
+Example (PS/2 set-2):
 
 ```
 Shift press   → 0x12
@@ -61,33 +34,47 @@ Shift press   → 0x12
 Shift release → F0 12
 ```
 
-இந்த bytes computer-க்கு அனுப்பப்படும்.
+இந்த data bus வழியாக computer-க்கு வரும்.
 
 ---
 
 # 2️⃣ CPU interrupt
 
-Keyboard hardware interrupt trigger செய்கிறது:
+Hardware interrupt:
 
 ```
 IRQ1
 ```
 
-CPU:
+CPU interrupt handler run செய்யும்.
+
+Kernel interrupt entry:
 
 ```
-User Mode → Kernel Mode
+arch/x86/kernel/irq.c
 ```
 
-Kernel interrupt handler run ஆகும்.
+Call path:
+
+```
+do_IRQ()
+↓
+handle_irq()
+↓
+keyboard interrupt handler
+```
 
 ---
 
-# 3️⃣ Keyboard driver
+# 3️⃣ Linux keyboard driver
 
-**Kernel Space**
+Driver file:
 
-Linux keyboard driver scan code read செய்கிறது.
+```
+drivers/input/keyboard/atkbd.c
+```
+
+Driver scan code read செய்கிறது.
 
 Example:
 
@@ -101,325 +88,417 @@ Driver convert செய்கிறது:
 scan code → keycode
 ```
 
-Example Linux keycodes:
+Example:
 
 ```
-KEY_3 = 4
-KEY_LEFTSHIFT = 42
+KEY_3
+KEY_LEFTSHIFT
 ```
-
-Event generate:
-
-```
-EV_KEY KEY_LEFTSHIFT 1
-EV_KEY KEY_3        1
-EV_KEY KEY_3        0
-EV_KEY KEY_LEFTSHIFT 0
-```
-
-இதுவரை **character உருவாகவில்லை**.
 
 ---
 
-# 4️⃣ Keyboard layout mapping
+# 4️⃣ Linux input subsystem
 
-**Kernel Space**
-
-Kernel terminal subsystem check செய்கிறது:
+Kernel subsystem:
 
 ```
-modifier = SHIFT
-key = KEY_3
+drivers/input/input.c
 ```
 
-Layout table:
+Event create செய்யும்:
 
 ```
-KEY_3       → '3'
-SHIFT+KEY_3 → '#'
+EV_KEY KEY_LEFTSHIFT 1
+EV_KEY KEY_3         1
+EV_KEY KEY_3         0
+EV_KEY KEY_LEFTSHIFT 0
 ```
 
-இப்போது character உருவாகிறது:
+Meaning:
+
+| field  | meaning        |
+| ------ | -------------- |
+| EV_KEY | keyboard event |
+| KEY_3  | key identifier |
+| 1      | press          |
+| 0      | release        |
+
+---
+
+# 5️⃣ Keyboard layout mapping
+
+Kernel TTY layer.
+
+Source:
 
 ```
-#
+drivers/tty/vt/keyboard.c
+```
+
+Mapping table:
+
+```
+KEY_3 → '3'
+SHIFT + KEY_3 → '#'
+```
+
+Character create ஆகிறது:
+
+```
+'#'
 ```
 
 Encoding:
 
 ```
-ASCII = 35
-hex = 0x23
-binary = 00100011
+ASCII / UTF-8
+```
+
+Value:
+
+```
+0x23
 ```
 
 ---
 
-# 5️⃣ Kernel TTY buffer
+# 6️⃣ Kernel TTY buffer
 
-Character store செய்யப்படும்:
+Kernel store செய்யும்:
 
 ```
-TTY input buffer
+tty input buffer
+```
+
+Memory example:
+
+```
+Kernel Space
+-------------------
+0xffff2000 : 0x23
+```
+
+இதுவரை **User space ஒன்றும் பார்க்கவில்லை**.
+
+---
+
+# 7️⃣ User program waiting
+
+Editor program (example):
+
+* Vim
+* Visual Studio Code
+
+Editor call:
+
+```c
+read(0, buf, 1);
+```
+
+Meaning:
+
+| parameter | meaning     |
+| --------- | ----------- |
+| fd        | stdin       |
+| buf       | user buffer |
+| count     | bytes       |
+
+---
+
+# 8️⃣ Kernel → User copy
+
+Kernel function:
+
+```
+tty_read()
+↓
+copy_to_user()
 ```
 
 Example memory:
 
 ```
 Kernel Space
-----------------------
 0xffff2000 : 0x23
 ```
 
----
-
-# 6️⃣ read() system call wake up
-
-Editor program:
+Copy →
 
 ```
-read(0, buf, 1)
-```
-
-Kernel இந்த call satisfy செய்யும்.
-
-Kernel copy செய்கிறது:
-
-```
-copy_to_user(buf, tty_buffer, 1)
-```
-
----
-
-# 7️⃣ Kernel → User memory copy
-
-Memory change:
-
-```
-Kernel Space
-----------------------
-0xffff2000 : 0x23
-
-copy →
-
 User Space
-----------------------
+0x7ffe91a0 : 0x23
+```
+
+---
+
+# 9️⃣ Editor buffer update
+
+Editor store செய்யும்:
+
+```
+editor text buffer
+```
+
+Example:
+
+```
+User Space
+------------------
 0x7ffe9100 : 0x23
 ```
 
-Meaning:
-
-```
-buf[0] = '#'
-```
-
----
-
-# 8️⃣ Editor internal buffer update
-
-**User Space**
-
-Editor text buffer:
+Character:
 
 ```
 #
 ```
 
-Editor screen redraw செய்கிறது.
+---
 
-Terminal output:
+# 🔟 Screen draw
+
+Editor screen update:
+
+```
+editor
+↓
+write()
+↓
+kernel tty driver
+↓
+terminal
+↓
+GPU
+↓
+screen
+```
+
+Screen-ல் தெரியும்:
 
 ```
 #
 ```
 
-நீ இப்போது screen-ல் **# பார்க்கிறாய்**.
+இதுதான் **நீ key press செய்த உடனே screen-ல் தெரியும் reason**.
 
 ---
 
-# 9️⃣ File save
+# PART 2 — Save file
 
-நீ save செய்கிறாய்:
+இப்போது நீ save செய்கிறாய்:
 
 ```
 :w
 ```
 
-Editor system call:
+---
 
-```
-write(fd, buffer, size)
+# 1️⃣ User space write
+
+Editor call:
+
+```c
+write(fd, buffer, size);
 ```
 
 Example:
 
-```
-write(3, 0x7ffe9100, 1)
+```c
+write(3, 0x7ffe9100, 1);
 ```
 
 Meaning:
 
-| parameter    | meaning                   |
-| ------------ | ------------------------- |
-| `3`          | file descriptor (hello.c) |
-| `0x7ffe9100` | user memory address       |
-| `1`          | bytes                     |
+| parameter  | meaning         |
+| ---------- | --------------- |
+| 3          | file descriptor |
+| 0x7ffe9100 | user memory     |
+| 1          | bytes           |
 
 ---
 
-# 🔟 Kernel write
+# 2️⃣ System call entry
 
-**Kernel Space**
+CPU switch செய்யும்:
 
-System call:
+```
+Ring 3 → Ring 0
+```
+
+Kernel entry:
 
 ```
 sys_write()
 ```
 
-Kernel copy செய்கிறது:
+Source:
+
+```
+fs/read_write.c
+```
+
+---
+
+# 3️⃣ Kernel copy
+
+Kernel function:
+
+```
+copy_from_user()
+```
+
+Example:
 
 ```
 copy_from_user(kernel_buffer, 0x7ffe9100, 1)
 ```
 
-Memory:
+Kernel memory:
 
 ```
 Kernel Space
-----------------------
+------------------
 kernel_buffer : 0x23
 ```
 
 ---
 
-# 1️⃣1️⃣ VFS layer
+# 4️⃣ VFS layer
 
-Kernel check செய்கிறது:
-
-```
-fd = 3
-```
-
-Process file descriptor table:
+Kernel Virtual File System:
 
 ```
-0 → stdin
-1 → stdout
-2 → stderr
-3 → hello.c
-```
-
-Kernel call chain:
-
-```
-sys_write()
-↓
 vfs_write()
-↓
-filesystem driver
+```
+
+Source:
+
+```
+fs/vfs.c
+```
+
+Purpose:
+
+```
+filesystem independent interface
 ```
 
 ---
 
-# 1️⃣2️⃣ Filesystem driver
+# 5️⃣ Filesystem driver
 
 Example filesystem:
 
 * ext4
 
-Filesystem determine செய்கிறது:
+Functions:
 
 ```
-inode number
-data block
-offset
+ext4_file_write_iter()
+↓
+ext4_map_blocks()
+↓
+ext4_mb_new_blocks()
+```
+
+Free block allocation:
+
+```
+bitmap check
+↓
+free block find
 ```
 
 Example:
 
 ```
-hello.c → inode 14523
+block 8421
 ```
 
-inode structure:
+---
+
+# 6️⃣ Inode update
+
+Example inode:
 
 ```
 inode 14523
------------------
-size: 56
-blocks: [8421]
+```
+
+Metadata update:
+
+```
+size
+timestamps
+block pointers
+```
+
+Example:
+
+```
+inode 14523
+size : 1 byte
+block: 8421
 ```
 
 ---
 
-# 1️⃣3️⃣ Disk block update
+# 7️⃣ Disk write
 
-Disk block size:
-
-```
-4096 bytes
-```
-
-Actual data write:
+Data write:
 
 ```
 block 8421
--------------------
-23
--------------------
 ```
 
-Meaning:
+Disk:
 
 ```
-#
+0x23
 ```
+
+Binary stored.
 
 ---
 
-# COMPLETE PIPELINE
+# FINAL FULL FLOW
 
 ```
-Hardware
----------
 keyboard press
 ↓
 scan code
-
-Kernel Space
--------------
-interrupt
 ↓
-keyboard driver
+kernel keyboard driver
 ↓
-scan code → keycode
+input subsystem
 ↓
-keyboard layout mapping
+keycode
+↓
+layout mapping
 ↓
 character '#'
 ↓
-TTY buffer
-
-User Space
------------
+kernel tty buffer
+↓
 read()
+↓
+user buffer
 ↓
 editor buffer
 ↓
-screen display
-
-User Space
------------
+screen draw
+↓
+save command
+↓
 write()
-
-Kernel Space
--------------
-copy_from_user()
+↓
+sys_write
+↓
+copy_from_user
 ↓
 VFS
 ↓
-filesystem driver
+filesystem
 ↓
 inode update
 ↓
@@ -428,278 +507,21 @@ disk block write
 
 ---
 
-# Final concept (CSAPP idea)
-
-CSAPP book சொல்லும் core idea:
-
-```
-All information in a computer system is represented as bits.
-```
-
-Example:
-
-```
-'#'
-ASCII 35
-hex 0x23
-binary 00100011
-```
-
-அதே value:
-
-```
-keyboard
-RAM
-kernel
-filesystem
-disk
-```
-
-எங்கும் **bits ஆகவே travel செய்கிறது**.
+✅ இப்போது **STEP-1 முழுவதும் hardware → kernel → user → filesystem → disk** exact execution பார்த்தோம்.
 
 ---
 
-✅ இப்போது நாம் **keyboard → OS → program → filesystem → disk** முழு execution flow பார்த்துவிட்டோம்.
-
----
-
-நீ விரும்பினால் அடுத்ததாக நான் **`gcc hello.c` compile execution deep pipeline (preprocessor → compiler → assembler → linker → ELF → CPU execution)** இதே மாதிரி deep-ஆ காட்டலாம்.
-அது CSAPP Chapter-1ல் வரும் next big concept.
-
-
-----
-
-# inode clarity 
-
-ஆம் 👍 **மிகவும் சரியான புரிதல்** — ஆனால் ஒரு சிறிய திருத்தம் தேவை.
-**inode already இருக்கிறது**, ஆனால் **free block allocation inode-க்கு முன் நடக்கும்** என்று சொல்லுவது முழுமையாக சரி அல்ல.
-சரியான வரிசை என்னவென்றால்:
-
-> **filesystem முதலில் inode-ஐ identify செய்கிறது → பிறகு free block allocate செய்கிறது → பிறகு inode-ஐ update செய்கிறது**
-
-அதாவது **inode இல்லாமல் allocator வேலை செய்யாது**, ஏனெனில் allocator-க்கு file context (inode) தேவை.
-
-இதை exact order-ஆ பார்க்கலாம்.
-
----
-
-# 1️⃣ write() system call
-
-User space
-
-```c
-write(fd, buf, 1);
-```
-
-Kernel path:
+நீ விரும்பினால் அடுத்ததாக நான் ஒரு **மிக powerful diagram** காட்டலாம்:
 
 ```
-sys_write()
-↓
-vfs_write()
-↓
-filesystem (ext4)
+CPU registers
+Kernel memory
+User memory
+TTY buffer
+Editor buffer
+Disk block
 ```
 
----
-
-# 2️⃣ inode identify
-
-Kernel முதலில் file-ஐ கண்டுபிடிக்கும்.
-
-```
-fd → struct file → struct inode
-```
-
-Example
-
-```
-hello.c → inode 14523
-```
-
-inode metadata:
-
-```
-inode 14523
-----------------
-size: 56
-block pointers: [8420]
-```
-
----
-
-# 3️⃣ file offset determine
-
-filesystem பார்க்கும்:
-
-```
-file size = 56
-```
-
-write செய்ய வேண்டிய இடம்:
-
-```
-offset = 56
-```
-
----
-
-# 4️⃣ free block allocation
-
-இங்கே தான் allocator வேலை செய்யும்.
-
-ext4 allocator:
-
-```
-ext4_mb_new_blocks()
-```
-
-filesystem bitmap பார்க்கும்:
-
-```
-free block bitmap
---------------------------
-8420 used
-8421 free
-8422 free
-```
-
-allocator select செய்கிறது:
-
-```
-block = 8421
-```
-
----
-
-# 5️⃣ inode update
-
-இப்போது inode update செய்யப்படும்.
-
-Before:
-
-```
-inode 14523
-blocks: [8420]
-```
-
-After:
-
-```
-inode 14523
-blocks: [8420, 8421]
-```
-
-அதாவது:
-
-```
-inode → data block pointer
-```
-
----
-
-# 6️⃣ page cache update
-
-Linux direct disk write செய்யாது.
-
-RAM-ல் page cache update:
-
-```
-page cache
-------------------
-block 8421
-data = 0x23
-```
-
-page mark செய்யப்படும்:
-
-```
-dirty page
-```
-
----
-
-# 7️⃣ writeback
-
-background kernel thread flush செய்யும்:
-
-```
-page cache
-↓
-block layer
-↓
-device driver
-↓
-disk
-```
-
----
-
-# 8️⃣ disk block write
-
-disk update:
-
-```
-block 8421
-----------------
-0x23
-----------------
-```
-
-meaning
-
-```
-'#'
-```
-
----
-
-# 🔑 Correct execution order
-
-```
-write()
-↓
-identify inode
-↓
-calculate file offset
-↓
-allocate free block
-↓
-update inode block pointer
-↓
-update page cache
-↓
-writeback
-↓
-disk write
-```
-
----
-
-✔️ அதனால் உன் statement:
-
-> inode-க்கு முன்பே allocator நடக்கிறது
-
-❌ **சரியானது அல்ல**
-
-✔️ **correct statement**
-
-```
-inode identify
-↓
-allocator free block choose
-↓
-inode update
-```
-
----
-
-💡 ஒரு முக்கிய insight:
-
-Linux filesystem-ல் **inode = file identity**
-**block allocator = storage manager**
-
-இரண்டும் சேர்ந்து தான் file write நடக்கும்.
-
-------
+இதில் **actual addresses உடன் (# எப்படி RAM-ல் move ஆகிறது)** என்பதை காட்ட முடியும்.
+அது systems understanding-க்கு மிகவும் powerful.
 
