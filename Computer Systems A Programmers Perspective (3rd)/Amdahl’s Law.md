@@ -56,6 +56,9 @@ Slow parts limit total speed
 
 S = \frac{1}{(1-\alpha) + \frac{\alpha}{k}}
 
+
+Speedup S = Told / Tnew = 1 / [(1 - α) + α/k]
+
 ---
 
 ## 🧠 Meaning
