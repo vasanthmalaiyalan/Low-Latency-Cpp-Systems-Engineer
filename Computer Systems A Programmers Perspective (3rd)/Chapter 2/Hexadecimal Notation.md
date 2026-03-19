@@ -12,7 +12,10 @@ Hex:     0xFA1D37B  ← compact, easy to convert
 
 ---
 
-## Hex table — memorize பண்ணணும்---
+## Hex table — memorize பண்ணணும்
+![alt text](image.png)
+
+---
 
 ## Memory trick — A, C, F முதல்ல memorize
 
