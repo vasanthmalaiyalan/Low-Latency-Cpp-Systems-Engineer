@@ -14,13 +14,13 @@ unsigned int B2U(unsigned char x, int w) {
 int B2T(unsigned char x, int w) {
     int result = 0;
     // MSB (negative weight) 
-    int sign = (x >> (w -1)) & 1;
-    result -= sign * (1 << (w-1));
-
-    // remainig bits
-    for (int i = 0; i < w-1; i++) {
+    for (int i = 0; i < w; i++) {
         int xi = (x >> i) & 1;
-        result +- xi * (1 << i);
+
+        if (i == w-1)
+        result -= xi * (1 << i); // MSB negative
+        else
+        result += xi * (1 << i); //rest positive
     }
     return result;
 }
@@ -35,15 +35,16 @@ int B2T(unsigned char x, int w) {
     }
     // Show table row
     void show(unsigned char x, int w) {
-        pintf("0x%X  ", x);
+        printf("0x%X  ", x);
         print_binary(x, w);
-        printf("  B2U = %-2u B2T = %d\n",B2U(x, w));
+        printf(" B2U = %-2u B2T = %d\n",B2U(x, w), B2T(x, w));
     }
 int main() {
     int w = 4;
 
     printf("==== CSAPP Practice 2.17 ====\n\n");
-    printf("Hex Binary Unsigned  sgned\n");
+    printf("Hex Binary Unsigned  Signed\n");
+    printf("------------------------------\n");
 
     show(0xA, 4); // 1010
     show(0x1, 4); // 0001
