@@ -387,3 +387,6 @@ decimal → hex → binary
 
 வேணும்னா next:
 👉 `-12345 → 0xCFC7` எப்படி வந்தது full chain காட்டட்டா? 😏
+--------
+
+

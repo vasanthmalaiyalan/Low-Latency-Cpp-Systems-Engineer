@@ -34,13 +34,39 @@ int main() {
     printf(" -1234 as 16 bits because we use (short) as two's complement:\n");
     printf("step 1 method start with -12345 transfer to binary easy way below the comment out explain clearly and then first you use decimal to hex and then hex to binary is easy");
     printf(" 12345 = 0x3039\n");
-    printf(" OR: next method is -12345 + 65536 why beacuse short bit is 16 so we add that signed");
+    printf(" OR: next method is -12345 + 65536 why beacuse short bit is 16 so we add that signed why we add (+)=>(-12345 + 65536) beacuse signed to unsigned");
     printf(" Two method available one is two complement method another is this method like(65536 = 2^16, add 2^w like (65536 -12345 = 53191)to negative = unsigned)\n\n");
+
+    // ==================================
+    // BOOK EXAMPLE 2: unsigned -> int
+    // u = 4294967295 (UMax32) -> tu = -1
+    // =================================
+    printf("===BOOK EXAMPLE 2 ===\n\n");
+
+    unsigned u = 4294967295u; // UMax32 = 0xFFFFFFFF
+    int tu = (int) u;// two complement
+    printf("u = %u, tu = %d", u, tu);
+    //Output: u = 4294967295, tu = -1
+
+    printf("\nBit representation (same for both):\n");
+    printf("u bits: 11111111111111111111111111111111\n");
+    printf("tu bits: 00000000000000000000000000000001\n");
+
+    printf("WHY -1?\n");
+    printf("Unsigned Value is 4294967295 & Signed value is -1 , How?");
+    printf("unsigned int 4bytes = bit is 32 bits(2^31)=4294967295\n");
+    printf("Easy method of conversation unsigned byte is represent positive like 4294967295 and signed represent MSB=1(negative) so unsigned - signed = conversation like (4294967295-4294967296=-1)\n");
+    printf("Same as previous conversation like 16 bit ,signed to unsigned conversation (-12345+65536=53191)\n");
+    printf()
+
+
+
+
 
 }
 
 /*
-Two's complement method first convert binary -12345
+Two's complement method first convert binary -12345 (Signed to unsigned conversation)
 
 =============================================
 
@@ -131,7 +157,7 @@ reverse
 👉 powers of 16 use பண்ணி build பண்ணலாம்
 ================================================
 
-we use 2nd method decimal to hex to binary is easy one
+we use 2nd method decimal to hex to binary is easy one and this is Actual Two complement method
 
 🧠 Step 1: Positive value convert பண்ணு
 
@@ -184,5 +210,13 @@ flip bits
 👉 OR shortcut:
 
 - x = 2^w - x
+
+*/
+
+//============================================
+
+/*
+Unsigned to signed Conversation (4294967295 to -1)
+
 
 */
