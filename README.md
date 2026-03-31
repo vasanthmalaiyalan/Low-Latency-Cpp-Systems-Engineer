@@ -2,6 +2,8 @@
 
 ---
 
+![alt text](image-1.png)
+
 ## 1️⃣ Computer Systems Fundamentals
 
 **Start with how computers actually run programs.**
