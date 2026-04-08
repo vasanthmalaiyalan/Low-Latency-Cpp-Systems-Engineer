@@ -109,3 +109,5 @@ Step 3: Add 1  = 1100 1111 1100 0111₂
 ```
 
 So **-12345 in two's complement** = `1100 1111 1100 0111` (which matches our original binary!) ✓
+
+--
