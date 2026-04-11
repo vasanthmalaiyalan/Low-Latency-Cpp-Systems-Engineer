@@ -26,7 +26,7 @@ int main() {
         {-2000, -3000},    // normal negative
     };
 
-    int n = sizeof(test) / sizeof(test[0]);
+    int n = sizeof(test) / sizeof(test[0]); // 40/8 = 5
 
     printf("========== signed Addition Overflow Check ==========\n");
 
